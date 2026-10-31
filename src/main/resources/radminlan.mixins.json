@@ -4,7 +4,12 @@
   "package": "dev.radminlan.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
-    "MultiplayerScreenMixin"
+    "MultiplayerScreenMixin",
+    "LanServerListAccessor",
+    "LanServerEntryMixin",
+    "LanServerEntryDataAccessor",
+    "LanServerListMixin",
+    "AbstractSelectionListAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

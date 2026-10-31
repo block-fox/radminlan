@@ -1,5 +1,8 @@
 pluginManagement {
     repositories {
+        maven { url = uri(rootDir.toString() + '/local-maven') }
+        maven { url = uri(rootDir.toString() + '/.gradle/loom-cache/minecraftMaven') }
+        maven { url = uri(System.getProperty('user.home') + '/.gradle/caches/fabric-loom/minecraftMaven') }
         maven { url = 'https://maven.fabricmc.net/' }
         gradlePluginPortal()
         mavenCentral()
@@ -9,10 +12,14 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
+        maven { url = uri(rootDir.toString() + '/local-maven') }
+        maven { url = uri(rootDir.toString() + '/.gradle/loom-cache/minecraftMaven') }
+        maven { url = uri(System.getProperty('user.home') + '/.gradle/caches/fabric-loom/minecraftMaven') }
         maven { url = 'https://maven.fabricmc.net/' }
+        maven { url = 'https://libraries.minecraft.net/' }
+        maven { url = 'https://maven.terraformersmc.com/releases' }
         mavenCentral()
     }
 }
 
 rootProject.name = 'radminlan'
-

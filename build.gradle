@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version "${loom_version}"
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
     id 'maven-publish'
 }
 
@@ -15,20 +15,51 @@ repositories {
     maven { url = 'https://maven.terraformersmc.com/releases' }
 }
 
-dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+def useLocalRuntime = (findProperty('use_local_runtime') ?: 'true').toString().toBoolean()
+def localRuntime = useLocalRuntime && project.minecraft_version.toString() == '26.3'
 
-    modImplementation "dev.isxander:yet-another-config-lib:3.9.7+26.3-fabric"
-    modImplementation "com.terraformersmc:modmenu:17.0.0"
+dependencies {
+    if (localRuntime) {
+        minecraft("com.mojang:minecraft:${project.minecraft_version}") { transitive = false }
+    } else {
+        minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    }
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    if (localRuntime) {
+        implementation files("libs/fabric-api-${project.fabric_version}.jar")
+        implementation fileTree(dir: 'libs/fabric-api-nested', include: '*.jar')
+        implementation files('libs/brigadier.jar')
+        implementation files('libs/datafixerupper.jar')
+        minecraftRuntimeLibraries files('libs/authlib.jar')
+        minecraftRuntimeLibraries "com.mojang:blocklist:1.0.10"
+        minecraftRuntimeLibraries files('libs/datafixerupper.jar')
+        minecraftRuntimeLibraries files('libs/brigadier.jar')
+        minecraftRuntimeLibraries files('libs/logging.jar')
+        minecraftRuntimeLibraries files('libs/jtracy.jar')
+        implementation files("libs/modmenu-${project.modmenu_version}.jar")
+    } else {
+        implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+        implementation "com.terraformersmc:modmenu:${project.modmenu_version}"
+    }
 }
 
-processResources {
-    inputs.property 'version', project.version
+if (localRuntime) {
+    configurations.configureEach {
+        exclude group: "com.mojang", module: "brigadier"
+        exclude group: "com.mojang", module: "datafixerupper"
+        exclude group: "com.mojang", module: "jtracy"
+        exclude group: "com.mojang", module: "logging"
+        exclude group: "com.mojang", module: "patchy"
+        exclude group: "com.mojang", module: "text2speech"
+    }
+}
+def modVersion = project.version.toString()
+def minecraftDependency = (findProperty('minecraft_dependency') ?: ">=${project.minecraft_version}").toString()
+tasks.named('processResources') {
+    inputs.property 'version', modVersion
+    inputs.property 'minecraft_dependency', minecraftDependency
     filesMatching('fabric.mod.json') {
-        expand 'version': project.version
+        expand 'version': modVersion, 'minecraft_dependency': minecraftDependency
     }
 }
 
@@ -43,8 +74,9 @@ java {
 }
 
 jar {
+    def archiveBaseName = base.archivesName.get()
     from('LICENSE') {
-        rename { name -> "${name}_${project.base.archivesName.get()}" }
+        rename { name -> "${name}_${archiveBaseName}" }
     }
 }
 
@@ -59,3 +91,23 @@ publishing {
     }
 }
 
+tasks.named("runClient") {
+    jvmArgs "--enable-native-access=ALL-UNNAMED"
+    if (localRuntime) {
+        classpath += files("libs/authlib.jar", "libs/datafixerupper.jar", "libs/brigadier.jar", "libs/logging.jar", "libs/jtracy.jar", "libs/text2speech.jar")
+        classpath += files(layout.buildDirectory.dir("dev-libraries"))
+        dependsOn("unpackDevLibraries")
+    }
+}
+
+if (localRuntime) {
+    tasks.register("unpackDevLibraries", Copy) {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        from(zipTree("libs/authlib.jar"))
+        from(zipTree("libs/datafixerupper.jar"))
+        from(zipTree("libs/brigadier.jar"))
+        from(zipTree("libs/jtracy.jar"))
+        from(zipTree("libs/text2speech.jar"))
+        into(layout.buildDirectory.dir("dev-libraries"))
+    }
+}

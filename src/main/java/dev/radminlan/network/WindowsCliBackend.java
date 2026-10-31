@@ -43,7 +43,7 @@ public final class WindowsCliBackend implements RadminBackend {
                 }
                 boolean ready = process.waitFor() == 0;
                 return new RadminSnapshot(ready ? RadminBackend.ServiceState.READY : RadminBackend.ServiceState.ERROR,
-                        "", "", parseNetworks(lines), ready ? "" : "Radmin CLI returned an error");
+                        "", "", parseNetworks(lines), ready ? "" : "Radmin CLI returned an error", ready, "Radmin CLI");
             } catch (Exception e) {
                 return RadminSnapshot.unavailable(e.getMessage() == null ? "Unable to start Radmin CLI" : e.getMessage());
             }
@@ -70,7 +70,7 @@ public final class WindowsCliBackend implements RadminBackend {
         List<RadminBackend.Network> networks = new ArrayList<>();
         for (String line : lines) {
             String trimmed = line.trim();
-            if (!trimmed.isEmpty() && !trimmed.startsWith("#")) networks.add(new RadminBackend.Network(trimmed, "", List.of()));
+            if (!trimmed.isEmpty() && !trimmed.startsWith("#")) networks.add(new RadminBackend.Network(trimmed, "", "", List.of()));
         }
         return networks;
     }

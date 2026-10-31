@@ -6,4 +6,19 @@ out/
 .idea/
 config/
 .tmp-javac/
+.tools/
+.gradle-*/
+.gradle-user-*/
+.modmenu-meta/
+.tmp*/
+.tmp-*
+*.log
+*.log.err
+libs/
+local-maven/
+runtime-classes/
+runtime-src/
+gradle-*-bin.zip
+radmin-pipe-capture.bin
+yarn.json
 
