@@ -1,0 +1,25 @@
+{
+  "category.radminlan": "RadminLAN",
+  "screen.radminlan.title": "RadminLAN 管理",
+  "screen.radminlan.networks": "网络",
+  "screen.radminlan.peers": "用户",
+  "screen.radminlan.rooms": "局域网房间",
+  "screen.radminlan.blocked": "已屏蔽",
+  "screen.radminlan.refresh": "刷新",
+  "screen.radminlan.close": "关闭",
+  "screen.radminlan.unblock": "解除屏蔽",
+  "screen.radminlan.block": "屏蔽",
+  "screen.radminlan.retry": "重试",
+  "screen.radminlan.unavailable": "未检测到 Radmin 客户端",
+  "screen.radminlan.no_rooms": "未发现局域网房间",
+  "screen.radminlan.no_blocked": "没有已屏蔽房间",
+  "screen.radminlan.service_ready": "Radmin 服务已就绪",
+  "screen.radminlan.service_unavailable": "Radmin 服务不可用",
+  "screen.radminlan.join": "加入",
+  "screen.radminlan.leave": "离开",
+  "screen.radminlan.create": "创建",
+  "screen.radminlan.network_name": "网络",
+  "screen.radminlan.virtual_ip": "虚拟 IP",
+  "screen.radminlan.latency": "%d 毫秒"
+}
+

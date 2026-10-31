@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "radminlan",
+  "version": "${version}",
+  "name": "RadminLAN",
+  "description": "Manage Radmin LAN/VPN networks and LAN rooms from inside Minecraft.",
+  "authors": ["RadminLAN Mod contributors"],
+  "contact": {
+    "issues": "https://github.com/example/radminlan/issues"
+  },
+  "license": "MIT",
+  "icon": "assets/radminlan/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.radminlan.RadminLanClient"
+    ],
+    "modmenu": [
+      "dev.radminlan.compat.ModMenuEntrypoint"
+    ]
+  },
+  "mixins": [
+    "radminlan.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "fabric-api": "*",
+    "minecraft": ">=26.3",
+    "java": ">=25",
+    "yet_another_config_lib_v3": ">=3.9.7"
+  },
+  "suggests": {
+    "yet_another_config_lib_v3": "*",
+    "modmenu": "*"
+  }
+}
+

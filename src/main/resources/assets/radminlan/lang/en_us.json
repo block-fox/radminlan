@@ -1,0 +1,25 @@
+{
+  "category.radminlan": "RadminLAN",
+  "screen.radminlan.title": "RadminLAN",
+  "screen.radminlan.networks": "Networks",
+  "screen.radminlan.peers": "Peers",
+  "screen.radminlan.rooms": "LAN Rooms",
+  "screen.radminlan.blocked": "Blocked",
+  "screen.radminlan.refresh": "Refresh",
+  "screen.radminlan.close": "Close",
+  "screen.radminlan.unblock": "Unblock",
+  "screen.radminlan.block": "Block",
+  "screen.radminlan.retry": "Retry",
+  "screen.radminlan.unavailable": "Radmin client not detected",
+  "screen.radminlan.no_rooms": "No LAN rooms found",
+  "screen.radminlan.no_blocked": "No blocked rooms",
+  "screen.radminlan.service_ready": "Radmin service ready",
+  "screen.radminlan.service_unavailable": "Radmin service unavailable",
+  "screen.radminlan.join": "Join",
+  "screen.radminlan.leave": "Leave",
+  "screen.radminlan.create": "Create",
+  "screen.radminlan.network_name": "Network",
+  "screen.radminlan.virtual_ip": "Virtual IP",
+  "screen.radminlan.latency": "%d ms"
+}
+
