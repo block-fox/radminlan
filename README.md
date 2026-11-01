@@ -2,7 +2,9 @@
 
 RadminLAN 是一个面向 Fabric 26.3 的客户端模组，用于在 Minecraft 内查看 Radmin LAN/VPN 状态、网络和用户，并集中管理局域网房间。
 
-当前版本：`0.1.1`
+当前版本：`0.1.2`
+
+作者：flexfox0424（GitHub: block-fox）
 
 ## 已实现
 
@@ -14,12 +16,20 @@ RadminLAN 是一个面向 Fabric 26.3 的客户端模组，用于在 Minecraft �
 - 房间支持按 IP、IP+端口或 MOTD 记忆屏蔽，屏蔽后移动到独立页签，可恢复显示。
 - Mod Menu 提供配置入口，配置保存到 `config/radminlan.json`。
 
+## 版本目录
+
+- `versions/26.3/`：Fabric 26.3 构建配置和输出包。
+- `versions/26.2/`：Fabric 26.2 构建配置和输出包。
+- `versions/1.21.11/`：使用独立源码和 Gradle 配置的 Fabric 1.21.11 移植工程。
+
+26.2 和 26.3 共用代码，各自配置和打包产物分开放置。1.21.11 的 Minecraft GUI API 不同，因此使用独立源码。每个构建包文件名都会标注兼容版本，例如 `radminlan-0.1.2-26.3.jar`、`radminlan-0.1.2-26.2.jar` 和 `radminlan-0.1.2-1.21.11.jar`。
+
 ## 调试构建
 
-使用 JDK 25 构建 Fabric 26.3：
+使用 JDK 25 构建 Fabric 26.3 并整理到 `versions/26.3/build/`：
 
 ```text
-gradlew.bat build --offline
+powershell -ExecutionPolicy Bypass -File scripts/build-26.3.ps1
 gradlew.bat runClient --offline
 ```
 
@@ -29,13 +39,19 @@ gradlew.bat runClient --offline
 gradlew.bat build -Puse_local_runtime=false
 ```
 
-26.2 兼容构建已经验证通过。它使用独立的版本配置，避免覆盖当前 26.3 开发配置：
+Fabric 26.2 使用独立配置，构建包整理到 `versions/26.2/build/`：
 
 ```text
 powershell -ExecutionPolicy Bypass -File scripts/build-26.2.ps1
 ```
 
-如果本机使用的是 JDK 21，请先切换到 JDK 25。
+Fabric 1.21.11 工程使用 JDK 21：
+
+```text
+gradlew.bat -p versions/1.21.11 build
+```
+
+Fabric 26.2 和 26.3 构建使用 JDK 25。
 
 ## 配置示例
 

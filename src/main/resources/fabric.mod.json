@@ -4,8 +4,10 @@
   "version": "${version}",
   "name": "RadminLAN",
   "description": "Manage Radmin LAN/VPN networks and LAN rooms from inside Minecraft.",
-  "authors": ["RadminLAN Mod contributors"],
+  "authors": ["flexfox0424"],
   "contact": {
+    "homepage": "https://github.com/block-fox/radminlan",
+    "sources": "https://github.com/block-fox/radminlan",
     "issues": "https://github.com/block-fox/radminlan/issues"
   },
   "license": "MIT",

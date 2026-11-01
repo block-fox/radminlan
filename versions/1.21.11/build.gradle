@@ -1,0 +1,56 @@
+plugins {
+    id 'fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    maven { url = 'https://maven.terraformersmc.com/releases' }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    modCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
+    implementation "net.java.dev.jna:jna:5.15.0"
+    implementation "net.java.dev.jna:jna-platform:5.15.0"
+    include "net.java.dev.jna:jna:5.15.0"
+    include "net.java.dev.jna:jna-platform:5.15.0"
+}
+
+def modVersion = project.version.toString()
+def minecraftDependency = project.minecraft_version.toString()
+
+tasks.named('processResources') {
+    inputs.property 'version', modVersion
+    inputs.property 'minecraft_dependency', minecraftDependency
+    filesMatching('fabric.mod.json') {
+        expand 'version': modVersion,
+                'minecraft_dependency': minecraftDependency
+    }
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+}
+
+def archiveBaseName = project.archives_base_name.toString()
+
+jar {
+    from('../../LICENSE') {
+        rename { name -> "${name}_${archiveBaseName}" }
+    }
+}
