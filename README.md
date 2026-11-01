@@ -2,6 +2,8 @@
 
 RadminLAN 是一个面向 Fabric 26.3 的客户端模组，用于在 Minecraft 内查看 Radmin LAN/VPN 状态、网络和用户，并集中管理局域网房间。
 
+当前版本：`0.1.1`
+
 ## 已实现
 
 - 在多人游戏界面添加可配置位置的 RadminLAN 入口。

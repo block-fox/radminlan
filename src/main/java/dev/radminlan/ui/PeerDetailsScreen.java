@@ -14,6 +14,13 @@ public final class PeerDetailsScreen extends Screen {
     private final Screen parent;
     private final RadminBackend.Peer peer;
     private String copyStatus = "";
+    private RadminBackend.RadminSnapshot cachedNetworkSnapshot;
+    private String[] cachedIdentityValues;
+    private String[] cachedIdentityCopyValues;
+    private String[] cachedNetworkValues;
+    private String[] cachedNetworkCopyValues;
+    private String[] cachedConnectionValues;
+    private String[] cachedConnectionCopyValues;
 
     public PeerDetailsScreen(Screen parent, RadminBackend.Peer peer) {
         super(Component.translatable("screen.radminlan.properties").append(": ").append(peer.name()));
@@ -34,6 +41,7 @@ public final class PeerDetailsScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        ensureCachedValues();
         extractTransparentBackground(graphics);
         graphics.fill(0, 0, width, height, 0xB0000000);
         graphics.centeredText(font, Component.literal(truncate(title.getString(), width - 32)), width / 2, 8, 0xFFFFFFFF);
@@ -50,27 +58,27 @@ public final class PeerDetailsScreen extends Screen {
         int connectionHeight = 84;
 
         drawGroup(graphics, x, y, panelWidth, identityHeight, Component.translatable("screen.radminlan.peer_information"));
-        drawProperty(graphics, x, y, panelWidth, "name", peer.name(), 0, 0xFFE6EAF0);
-        drawProperty(graphics, x, y, panelWidth, "ipv4", emptyDash(peer.virtualIp()), 1, 0xFFE6EAF0);
-        drawProperty(graphics, x, y, panelWidth, "id", peer.nodeId() < 0 ? emptyValue() : Long.toUnsignedString(peer.nodeId()), 2, 0xFFE6EAF0);
-        drawProperty(graphics, x, y, panelWidth, "rid", emptyValue(), 3, 0xFFB0BAC4);
-        drawProperty(graphics, x, y, panelWidth, "ipv6", emptyDash(peer.virtualIpv6()), 4, 0xFFE6EAF0);
-        drawProperty(graphics, x, y, panelWidth, "node_ip", emptyDash(peer.publicIp()), 5, 0xFFE6EAF0);
+        drawProperty(graphics, x, y, panelWidth, "name", cachedIdentityValues[0], 0, 0xFFE6EAF0);
+        drawProperty(graphics, x, y, panelWidth, "ipv4", cachedIdentityValues[1], 1, 0xFFE6EAF0);
+        drawProperty(graphics, x, y, panelWidth, "id", cachedIdentityValues[2], 2, 0xFFE6EAF0);
+        drawProperty(graphics, x, y, panelWidth, "rid", cachedIdentityValues[3], 3, 0xFFB0BAC4);
+        drawProperty(graphics, x, y, panelWidth, "ipv6", cachedIdentityValues[4], 4, 0xFFE6EAF0);
+        drawProperty(graphics, x, y, panelWidth, "node_ip", cachedIdentityValues[5], 5, 0xFFE6EAF0);
 
         y += identityHeight + gap;
         drawGroup(graphics, x, y, panelWidth, networkHeight, Component.translatable("screen.radminlan.network_status"));
-        drawProperty(graphics, x, y, panelWidth, "network_name", emptyDash(networkNames()), 0, 0xFFE6EAF0);
-        drawProperty(graphics, x, y, panelWidth, "role", roleText(), 1, 0xFFE6EAF0);
+        drawProperty(graphics, x, y, panelWidth, "network_name", cachedNetworkValues[0], 0, 0xFFE6EAF0);
+        drawProperty(graphics, x, y, panelWidth, "role", cachedNetworkValues[1], 1, 0xFFE6EAF0);
 
         y += networkHeight + gap;
         drawGroup(graphics, x, y, panelWidth, connectionHeight, Component.translatable("screen.radminlan.connection_status"));
-        drawProperty(graphics, x, y, panelWidth, "state", emptyDash(peer.state()), 0, 0xFFE6EAF0);
-        drawProperty(graphics, x, y, panelWidth, "channel", emptyDash(peer.connectionType()), 1, 0xFFE6EAF0);
-        drawProperty(graphics, x, y, panelWidth, "latency", formatLatency(peer.latencyMs(), peer.online()), 2,
+        drawProperty(graphics, x, y, panelWidth, "state", cachedConnectionValues[0], 0, 0xFFE6EAF0);
+        drawProperty(graphics, x, y, panelWidth, "channel", cachedConnectionValues[1], 1, 0xFFE6EAF0);
+        drawProperty(graphics, x, y, panelWidth, "latency", cachedConnectionValues[2], 2,
                 peer.online() ? 0xFFE6EAF0 : 0xFFFF6666);
-        drawProperty(graphics, x, y, panelWidth, "state", peer.online() ? "Online" : "Offline", 3,
+        drawProperty(graphics, x, y, panelWidth, "state", cachedConnectionValues[3], 3,
                 peer.online() ? 0xFF72D18A : 0xFFFF6666);
-        drawProperty(graphics, x, y, panelWidth, "version", emptyDash(peer.version()), 4, 0xFFE6EAF0);
+        drawProperty(graphics, x, y, panelWidth, "version", cachedConnectionValues[4], 4, 0xFFE6EAF0);
         if (!copyStatus.isBlank()) graphics.text(font, copyStatus, 20, height - 48, 0xFF9FC8E8);
         super.extractRenderState(graphics, mouseX, mouseY, delta);
     }
@@ -111,22 +119,18 @@ public final class PeerDetailsScreen extends Screen {
     }
 
     private String valueAt(int x, int y, int mouseX, int mouseY) {
+        ensureCachedValues();
         int panelWidth = Math.min(620, width - 32);
-        String[] identity = {peer.name(), peer.virtualIp(), peer.nodeId() < 0 ? "" : Long.toUnsignedString(peer.nodeId()), "",
-                peer.virtualIpv6(), peer.publicIp()};
-        for (int row = 0; row < identity.length; row++) {
-            if (hitRow(x, y + 23 + row * 13, panelWidth, mouseX, mouseY)) return identity[row];
+        for (int row = 0; row < cachedIdentityCopyValues.length; row++) {
+            if (hitRow(x, y + 23 + row * 13, panelWidth, mouseX, mouseY)) return cachedIdentityCopyValues[row];
         }
         y += 102 + 8;
-        String[] network = {networkNames(), roleText()};
-        for (int row = 0; row < network.length; row++) {
-            if (hitRow(x, y + 23 + row * 13, panelWidth, mouseX, mouseY)) return network[row];
+        for (int row = 0; row < cachedNetworkCopyValues.length; row++) {
+            if (hitRow(x, y + 23 + row * 13, panelWidth, mouseX, mouseY)) return cachedNetworkCopyValues[row];
         }
         y += 50 + 8;
-        String[] connection = {peer.state(), peer.connectionType(), formatLatency(peer.latencyMs(), peer.online()),
-                peer.online() ? "Online" : "Offline", peer.version()};
-        for (int row = 0; row < connection.length; row++) {
-            if (hitRow(x, y + 23 + row * 13, panelWidth, mouseX, mouseY)) return connection[row];
+        for (int row = 0; row < cachedConnectionCopyValues.length; row++) {
+            if (hitRow(x, y + 23 + row * 13, panelWidth, mouseX, mouseY)) return cachedConnectionCopyValues[row];
         }
         return null;
     }
@@ -135,15 +139,35 @@ public final class PeerDetailsScreen extends Screen {
         return mouseX >= x + 8 && mouseX <= x + panelWidth - 8 && mouseY >= rowY - 2 && mouseY <= rowY + 10;
     }
 
-    private String networkNames() {
-        if (RadminLanClient.cachedSnapshot() == null) return peer.networkName();
-        String names = RadminLanClient.cachedSnapshot().networks().stream()
+    private void ensureCachedValues() {
+        RadminBackend.RadminSnapshot snapshot = RadminLanClient.cachedSnapshot();
+        if (cachedIdentityValues != null && cachedNetworkSnapshot == snapshot) return;
+        cachedNetworkSnapshot = snapshot;
+        String names = snapshot == null ? peer.networkName() : snapshot.networks().stream()
                 .filter(network -> network.peers().stream().anyMatch(candidate -> samePeer(candidate, peer)))
                 .map(RadminBackend.Network::name)
                 .distinct()
                 .reduce((left, right) -> left + ", " + right)
                 .orElse("");
-        return names.isBlank() ? peer.networkName() : names;
+        String networkNames = names.isBlank() ? peer.networkName() : names;
+        String role = peer.role() == null ? emptyValue() : Component.translatable(switch (peer.role().intValue()) {
+            case 1 -> "screen.radminlan.role_member";
+            case 2 -> "screen.radminlan.role_admin";
+            case 3 -> "screen.radminlan.role_pending";
+            default -> "screen.radminlan.property.not_provided";
+        }).getString();
+        cachedIdentityValues = new String[]{peer.name(), emptyDash(peer.virtualIp()),
+                peer.nodeId() < 0 ? emptyValue() : Long.toUnsignedString(peer.nodeId()), emptyValue(),
+                emptyDash(peer.virtualIpv6()), emptyDash(peer.publicIp())};
+        cachedIdentityCopyValues = new String[]{peer.name(), emptyText(peer.virtualIp()),
+                peer.nodeId() < 0 ? "" : Long.toUnsignedString(peer.nodeId()), "",
+                emptyText(peer.virtualIpv6()), emptyText(peer.publicIp())};
+        cachedNetworkValues = new String[]{emptyDash(networkNames), role};
+        cachedNetworkCopyValues = new String[]{networkNames, role};
+        cachedConnectionValues = new String[]{emptyDash(peer.state()), emptyDash(peer.connectionType()),
+                formatLatency(peer.latencyMs(), peer.online()), peer.online() ? "Online" : "Offline", emptyDash(peer.version())};
+        cachedConnectionCopyValues = new String[]{emptyText(peer.state()), emptyText(peer.connectionType()),
+                formatLatency(peer.latencyMs(), peer.online()), peer.online() ? "Online" : "Offline", emptyText(peer.version())};
     }
 
     private static boolean samePeer(RadminBackend.Peer left, RadminBackend.Peer right) {
@@ -152,15 +176,8 @@ public final class PeerDetailsScreen extends Screen {
     }
 
     private static String emptyDash(String value) { return value == null || value.isBlank() ? "-" : value; }
+    private static String emptyText(String value) { return value == null ? "" : value; }
     private static String emptyValue() { return Component.translatable("screen.radminlan.property.not_provided").getString(); }
-    private String roleText() {
-        return peer.role() == null ? emptyValue() : Component.translatable(switch (peer.role().intValue()) {
-            case 1 -> "screen.radminlan.role_member";
-            case 2 -> "screen.radminlan.role_admin";
-            case 3 -> "screen.radminlan.role_pending";
-            default -> "screen.radminlan.property.not_provided";
-        }).getString();
-    }
     private String truncate(String value, int maxWidth) {
         if (value == null || font.width(value) <= maxWidth) return value == null ? "" : value;
         return font.plainSubstrByWidth(value, Math.max(1, maxWidth - font.width("..."))) + "...";

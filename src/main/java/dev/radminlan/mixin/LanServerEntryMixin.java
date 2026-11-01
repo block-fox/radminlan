@@ -43,6 +43,8 @@ public abstract class LanServerEntryMixin {
     private String radminlan$cachedFaviconData;
     private Identifier radminlan$cachedFaviconTexture;
     private long radminlan$cachedFaviconGeneration = -1L;
+    private String radminlan$cachedRoomAddress;
+    private RoomKey radminlan$cachedRoomKey;
 
     @Redirect(method = "extractContent", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;text(Lnet/minecraft/client/gui/Font;Lnet/minecraft/network/chat/Component;III)V"))
     private void radminlan$replaceLanHeader(GuiGraphicsExtractor graphics, Font font, Component header,
@@ -166,8 +168,15 @@ public abstract class LanServerEntryMixin {
 
     private LanRoomSnapshot radminlan$roomSnapshot() {
         if (RadminLanClient.ROOMS == null) return null;
-        RoomKey key = radminlan$roomKey(serverData.getAddress());
+        RoomKey key = radminlan$cachedRoomKey(serverData.getAddress());
         return key == null ? null : RadminLanClient.ROOMS.get(key);
+    }
+
+    private RoomKey radminlan$cachedRoomKey(String address) {
+        if (Objects.equals(radminlan$cachedRoomAddress, address)) return radminlan$cachedRoomKey;
+        radminlan$cachedRoomAddress = address;
+        radminlan$cachedRoomKey = radminlan$roomKey(address);
+        return radminlan$cachedRoomKey;
     }
 
     private RadminBackend.Peer radminlan$matchingPeer(LanRoomSnapshot room) {

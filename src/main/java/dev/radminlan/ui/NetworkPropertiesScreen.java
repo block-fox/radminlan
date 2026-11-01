@@ -12,6 +12,8 @@ public final class NetworkPropertiesScreen extends Screen {
     private final Screen parent;
     private final RadminBackend.Network network;
     private String copyStatus = "";
+    private String[] cachedValues;
+    private String[] cachedOptionValues;
 
     public NetworkPropertiesScreen(Screen parent, RadminBackend.Network network) {
         super(Component.translatable("screen.radminlan.network_properties"));
@@ -33,6 +35,7 @@ public final class NetworkPropertiesScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        ensureCachedValues();
         extractTransparentBackground(graphics);
         graphics.fill(0, 0, width, height, 0x99000000);
         int x = panelX();
@@ -43,21 +46,17 @@ public final class NetworkPropertiesScreen extends Screen {
         graphics.fill(x, y, x + panelWidth, y + 28, 0xFF202830);
         graphics.text(font, truncate(network.name(), panelWidth - 24), x + 12, y + 9, 0xFFFFFFFF);
         graphics.text(font, Component.translatable("screen.radminlan.network_information"), x + 12, y + 39, 0xFF9FC8E8);
-        drawProperty(graphics, x, y + 54, "network_name", network.name());
-        drawProperty(graphics, x, y + 72, "network_type", Component.translatable(network.publicNetwork()
-                ? "screen.radminlan.public_network" : "screen.radminlan.private_network").getString());
-        drawProperty(graphics, x, y + 90, "role", roleText());
-        drawProperty(graphics, x, y + 108, "members", Integer.toString(network.peers().size()));
-        drawProperty(graphics, x, y + 126, "network_state", network.enabled() == null
-                ? Component.translatable("screen.radminlan.property_unknown").getString()
-                : Component.translatable(Boolean.TRUE.equals(network.enabled())
-                ? "screen.radminlan.network_enabled" : "screen.radminlan.network_disabled").getString());
-        drawProperty(graphics, x, y + 144, "guid", network.guid());
+        drawProperty(graphics, x, y + 54, panelWidth, "network_name", cachedValues[0]);
+        drawProperty(graphics, x, y + 72, panelWidth, "network_type", cachedValues[1]);
+        drawProperty(graphics, x, y + 90, panelWidth, "role", cachedValues[2]);
+        drawProperty(graphics, x, y + 108, panelWidth, "members", cachedValues[3]);
+        drawProperty(graphics, x, y + 126, panelWidth, "network_state", cachedValues[4]);
+        drawProperty(graphics, x, y + 144, panelWidth, "guid", cachedValues[5]);
         if (!network.publicNetwork()) {
             graphics.text(font, Component.translatable("screen.radminlan.network_options"), x + 12, y + 168, 0xFF9FC8E8);
             if (Boolean.TRUE.equals(network.admin())) {
-                drawProperty(graphics, x, y + 186, "allow_passwordless", flagText(network.allowPasswordless()));
-                drawProperty(graphics, x, y + 204, "block_new_members", flagText(network.blockNewMembers()));
+                drawProperty(graphics, x, y + 186, panelWidth, "allow_passwordless", cachedOptionValues[0]);
+                drawProperty(graphics, x, y + 204, panelWidth, "block_new_members", cachedOptionValues[1]);
                 graphics.text(font, truncate(Component.translatable("screen.radminlan.property_write_unavailable").getString(), panelWidth - 24),
                         x + 12, y + panelHeight - 42, 0xFFAAAAAA);
             } else {
@@ -70,10 +69,10 @@ public final class NetworkPropertiesScreen extends Screen {
         super.extractRenderState(graphics, mouseX, mouseY, delta);
     }
 
-    private void drawProperty(GuiGraphicsExtractor graphics, int x, int y, String key, String value) {
-        graphics.fill(x + 8, y - 2, x + panelWidth() - 8, y + 11, (y / 18 & 1) == 0 ? 0x221D2931 : 0x12000000);
+    private void drawProperty(GuiGraphicsExtractor graphics, int x, int y, int panelWidth, String key, String value) {
+        graphics.fill(x + 8, y - 2, x + panelWidth - 8, y + 11, (y / 18 & 1) == 0 ? 0x221D2931 : 0x12000000);
         graphics.text(font, Component.translatable("screen.radminlan.property." + key).append(":"), x + 12, y, 0xFFB9C2CA);
-        graphics.text(font, truncate(value, panelWidth() - 170), x + 134, y, 0xFFE6EAF0);
+        graphics.text(font, truncate(value, panelWidth - 170), x + 134, y, 0xFFE6EAF0);
     }
 
     @Override
@@ -93,27 +92,31 @@ public final class NetworkPropertiesScreen extends Screen {
 
     private String valueAt(int x, int y, int mouseX, int mouseY) {
         int width = panelWidth();
-        String[] values = {
-                network.name(),
-                network.publicNetwork() ? Component.translatable("screen.radminlan.public_network").getString()
-                        : Component.translatable("screen.radminlan.private_network").getString(),
-                roleText(), Integer.toString(network.peers().size()),
-                network.enabled() == null ? Component.translatable("screen.radminlan.property_unknown").getString()
-                        : Component.translatable(Boolean.TRUE.equals(network.enabled()) ? "screen.radminlan.network_enabled" : "screen.radminlan.network_disabled").getString(),
-                network.guid()
-        };
+        ensureCachedValues();
         int[] ys = {y + 54, y + 72, y + 90, y + 108, y + 126, y + 144};
-        for (int i = 0; i < ys.length; i++) if (hitRow(x, ys[i], width, mouseX, mouseY)) return values[i];
+        for (int i = 0; i < ys.length; i++) if (hitRow(x, ys[i], width, mouseX, mouseY)) return cachedValues[i];
         if (!network.publicNetwork()) {
             int[] optionY = {y + 186, y + 204};
-            String[] optionValues = {flagText(network.allowPasswordless()), flagText(network.blockNewMembers())};
-            for (int i = 0; i < optionY.length; i++) if (hitRow(x, optionY[i], width, mouseX, mouseY)) return optionValues[i];
+            for (int i = 0; i < optionY.length; i++) if (hitRow(x, optionY[i], width, mouseX, mouseY)) return cachedOptionValues[i];
         }
         return null;
     }
 
     private static boolean hitRow(int x, int rowY, int width, int mouseX, int mouseY) {
         return mouseX >= x + 8 && mouseX <= x + width - 8 && mouseY >= rowY - 2 && mouseY <= rowY + 11;
+    }
+
+    private void ensureCachedValues() {
+        if (cachedValues != null) return;
+        cachedValues = new String[]{network.name(),
+                Component.translatable(network.publicNetwork()
+                        ? "screen.radminlan.public_network" : "screen.radminlan.private_network").getString(),
+                roleText(), Integer.toString(network.peers().size()),
+                network.enabled() == null ? Component.translatable("screen.radminlan.property_unknown").getString()
+                        : Component.translatable(Boolean.TRUE.equals(network.enabled())
+                        ? "screen.radminlan.network_enabled" : "screen.radminlan.network_disabled").getString(),
+                network.guid()};
+        cachedOptionValues = new String[]{flagText(network.allowPasswordless()), flagText(network.blockNewMembers())};
     }
 
     private String roleText() {

@@ -33,6 +33,8 @@ import java.nio.charset.StandardCharsets;
 /** Thread-safe cache shared by the vanilla LAN screen integration and Radmin screen. */
 public final class LanRoomRepository implements AutoCloseable {
     private static final int MAX_STATUS_BYTES = 2 * 1024 * 1024;
+    private static final Comparator<LanRoomSnapshot> MOST_RECENT_FIRST =
+            Comparator.comparingLong(LanRoomSnapshot::lastSeen).reversed();
     private final RadminConfig config;
     private final Map<RoomKey, LanRoomSnapshot> rooms = new LinkedHashMap<>();
     private final ExecutorService queryExecutor = Executors.newFixedThreadPool(4, r -> {
@@ -223,18 +225,22 @@ public final class LanRoomRepository implements AutoCloseable {
     public synchronized void clear() { rooms.clear(); }
     public synchronized LanRoomSnapshot get(RoomKey key) { return rooms.get(key); }
     public synchronized List<LanRoomSnapshot> visibleRooms() {
-        return rooms.values().stream()
-                .filter(room -> !config.isBlocked(room.key().ip(), room.key().port(), room.motd()))
-                .sorted(Comparator.comparing(LanRoomSnapshot::lastSeen).reversed())
-                .toList();
+        return filteredRooms(false);
     }
     public synchronized List<LanRoomSnapshot> blockedRooms() {
-        return rooms.values().stream()
-                .filter(room -> config.isBlocked(room.key().ip(), room.key().port(), room.motd()))
-                .sorted(Comparator.comparing(LanRoomSnapshot::lastSeen).reversed())
-                .toList();
+        return filteredRooms(true);
     }
     public synchronized Collection<LanRoomSnapshot> allRooms() { return new ArrayList<>(rooms.values()); }
+
+    private List<LanRoomSnapshot> filteredRooms(boolean blocked) {
+        List<LanRoomSnapshot> result = new ArrayList<>(rooms.size());
+        for (LanRoomSnapshot room : rooms.values()) {
+            boolean isBlocked = config.isBlocked(room.key().ip(), room.key().port(), room.motd());
+            if (isBlocked == blocked) result.add(room);
+        }
+        result.sort(MOST_RECENT_FIRST);
+        return List.copyOf(result);
+    }
     public ExecutorService queryExecutor() { return queryExecutor; }
     @Override public void close() { queryExecutor.shutdownNow(); }
 }
