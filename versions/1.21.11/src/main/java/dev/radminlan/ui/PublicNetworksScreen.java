@@ -267,8 +267,7 @@ public final class PublicNetworksScreen extends Screen {
             graphics.fill(width - 11, listTop(), width - 7, listBottom(), 0x66404040);
             graphics.fill(width - 11, thumbY(), width - 7, thumbY() + thumbHeight(), 0xFFB0B0B0);
         }
-        graphics.blitSprite(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                Screen.HEADER_SEPARATOR, 20, height - FOOTER, width - 40, 2);
+        graphics.fill(20, height - FOOTER, width - 20, height - FOOTER + 2, 0xFF555555);
         super.render(graphics, mouseX, mouseY, delta);
     }
 

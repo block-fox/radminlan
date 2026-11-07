@@ -557,8 +557,9 @@ public final class RadminScreen extends Screen {
         extractScrollbar(graphics);
         if (contextNetwork != null) extractContextPanel(graphics, contextNetwork.name());
         else if (contextPeer != null) extractContextPanel(graphics, contextPeer.name());
-        graphics.blitSprite(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                Screen.HEADER_SEPARATOR, 20, height - FOOTER_HEIGHT, width - 40, 2);
+        // 1.21.11 can resolve HEADER_SEPARATOR to the missing-texture sprite
+        // outside vanilla screens. Draw the separator directly instead.
+        graphics.fill(20, height - FOOTER_HEIGHT, width - 20, height - FOOTER_HEIGHT + 2, 0xFF555555);
         super.render(graphics, mouseX, mouseY, delta);
     }
 

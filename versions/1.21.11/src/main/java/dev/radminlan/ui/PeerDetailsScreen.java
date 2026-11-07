@@ -45,8 +45,7 @@ public final class PeerDetailsScreen extends Screen {
         renderTransparentBackground(graphics);
         graphics.fill(0, 0, width, height, 0xB0000000);
         graphics.drawCenteredString(font, Component.literal(truncate(title.getString(), width - 32)), width / 2, 8, 0xFFFFFFFF);
-        graphics.blitSprite(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                Screen.HEADER_SEPARATOR, 0, 29, width, 2);
+        graphics.fill(0, 29, width, 31, 0xFF555555);
 
         int panelWidth = Math.min(620, width - 32);
         int x = (width - panelWidth) / 2;
@@ -86,8 +85,7 @@ public final class PeerDetailsScreen extends Screen {
     private void drawGroup(GuiGraphics graphics, int x, int y, int width, int height, Component heading) {
         graphics.fill(x, y, x + width, y + height, 0xAA101820);
         graphics.drawString(font, heading, x + 10, y + 5, 0xFF9FC8E8);
-        graphics.blitSprite(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                Screen.HEADER_SEPARATOR, x + 8, y + 17, width - 16, 2);
+        graphics.fill(x + 8, y + 17, x + width - 8, y + 19, 0xFF555555);
     }
 
     private void drawProperty(GuiGraphics graphics, int x, int y, int panelWidth,
