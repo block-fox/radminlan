@@ -6,6 +6,8 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+import java.util.List;
+
 /** Full page for the properties of one Radmin network. */
 public final class NetworkPropertiesScreen extends Screen {
     private final Screen parent;
@@ -17,7 +19,8 @@ public final class NetworkPropertiesScreen extends Screen {
     public NetworkPropertiesScreen(Screen parent, RadminBackend.Network network) {
         super(Component.translatable("screen.radminlan.network_properties"));
         this.parent = parent;
-        this.network = network;
+        this.network = network == null
+                ? new RadminBackend.Network("", "", "", List.of()) : network;
     }
 
     @Override
@@ -35,7 +38,7 @@ public final class NetworkPropertiesScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
         ensureCachedValues();
-        renderBackground(graphics, mouseX, mouseY, delta);
+        renderTransparentBackground(graphics);
         graphics.fill(0, 0, width, height, 0x99000000);
         int x = panelX();
         int y = panelY();
@@ -76,7 +79,7 @@ public final class NetworkPropertiesScreen extends Screen {
 
     @Override
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        if (event.button() == 1 && minecraft != null) {
+        if (event.button() == 0 && minecraft != null) {
             int x = panelX();
             int y = panelY();
             String value = valueAt(x, y, (int) event.x(), (int) event.y());

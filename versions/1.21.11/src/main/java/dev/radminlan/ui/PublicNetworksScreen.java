@@ -220,7 +220,7 @@ public final class PublicNetworksScreen extends Screen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (event.button() == 1 && event.x() >= width - 18 && event.x() <= width - 4 && event.y() >= listTop() && event.y() <= listBottom() && maxScroll() > 0) {
+        if (event.button() == 0 && event.x() >= width - 18 && event.x() <= width - 4 && event.y() >= listTop() && event.y() <= listBottom() && maxScroll() > 0) {
             draggingScrollbar = true;
             dragGrabOffset = Math.max(0, (int) event.y() - thumbY());
             return true;

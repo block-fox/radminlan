@@ -706,7 +706,7 @@ public final class RadminScreen extends Screen {
             if (insideContextPanel(event.x(), event.y())) {
                 // Context menus are opened with the right mouse button, but
                 // their actions use the normal left mouse button.
-                if (event.button() == 1) {
+                if (event.button() == 0) {
                     for (int i = contextButtons.size() - 1; i >= 0; i--) {
                         AbstractButton button = contextButtons.get(i);
                         if (button.isMouseOver(event.x(), event.y())) {
@@ -721,7 +721,7 @@ public final class RadminScreen extends Screen {
             refreshDynamicWidgets();
             return true;
         }
-        if (event.button() == 1 && isOverScrollbar(event.x(), event.y()) && contentHeight() > listBottom() - listTop()) {
+        if (event.button() == 0 && isOverScrollbar(event.x(), event.y()) && contentHeight() > listBottom() - listTop()) {
             draggingScrollbar = true;
             int thumbHeight = scrollbarThumbHeight();
             dragGrabOffset = Math.max(0, (int) event.y() - scrollbarThumbY(thumbHeight));
@@ -1133,7 +1133,7 @@ public final class RadminScreen extends Screen {
             dynamicWidgetsDirty = true;
         }
         @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-            if (event.button() == 3) {
+            if (event.button() == 1) {
                 contextNetwork = network;
                 contextPeer = null;
                 contextMenuX = (int) event.x();
@@ -1141,7 +1141,7 @@ public final class RadminScreen extends Screen {
                 refreshDynamicWidgets();
                 return true;
             }
-            return event.button() == 1 && super.mouseClicked(event, doubleClick);
+            return event.button() == 0 && super.mouseClicked(event, doubleClick);
         }
         @Override protected void renderContents(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
             if (isHoveredOrFocused()) graphics.fill(getX(), getY(), getRight(), getBottom(), 0x225B8DB8);
@@ -1172,7 +1172,7 @@ public final class RadminScreen extends Screen {
             dynamicWidgetsDirty = true;
         }
         @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-            if (event.button() == 3) {
+            if (event.button() == 1) {
                 contextPeer = peer;
                 contextNetwork = null;
                 contextMenuX = (int) event.x();
@@ -1180,7 +1180,7 @@ public final class RadminScreen extends Screen {
                 refreshDynamicWidgets();
                 return true;
             }
-            return event.button() == 1 && super.mouseClicked(event, doubleClick);
+            return event.button() == 0 && super.mouseClicked(event, doubleClick);
         }
         @Override protected void renderContents(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
             if (isHoveredOrFocused()) graphics.fill(getX(), getY(), getRight(), getBottom(), 0x225B8DB8);

@@ -38,7 +38,7 @@ public final class LanRoomContextScreen extends Screen {
         this.parent = parent;
         this.room = room;
         this.peer = peer;
-        this.networks = networks == null ? List.of() : List.copyOf(networks);
+        this.networks = networks == null ? List.of() : networks.stream().filter(java.util.Objects::nonNull).toList();
     }
 
     @Override
@@ -49,6 +49,7 @@ public final class LanRoomContextScreen extends Screen {
                     () -> minecraft.setScreen(new PeerDetailsScreen(this, peer))));
         }
         for (RadminBackend.Network network : networks) {
+            if (network == null) continue;
             String label = Component.translatable("screen.radminlan.network_properties").getString()
                     + ": " + network.name();
             entries.add(new ActionEntry(Component.literal(label),
@@ -81,7 +82,7 @@ public final class LanRoomContextScreen extends Screen {
     }
 
     private void blockRoom() {
-        if (room != null) {
+        if (room != null && room.key() != null && RadminLanClient.CONFIG != null) {
             RadminLanClient.CONFIG.block(room.key().ip(), room.key().port(), room.motd());
             if (RadminLanClient.ROOMS != null) RadminLanClient.ROOMS.remove(room.key());
         }
@@ -95,7 +96,7 @@ public final class LanRoomContextScreen extends Screen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (event.button() == 1 && maxScroll() > 0 && event.x() >= panelX() + panelWidth() - 22
+        if (event.button() == 0 && maxScroll() > 0 && event.x() >= panelX() + panelWidth() - 22
                 && event.x() <= panelX() + panelWidth() - 8 && event.y() >= listTop() && event.y() <= listBottom()) {
             draggingScrollbar = true;
             dragGrabOffset = Math.max(0, (int) event.y() - thumbY());
@@ -157,7 +158,8 @@ public final class LanRoomContextScreen extends Screen {
 
         int coverX = x + 12;
         int coverY = y + 34;
-        Identifier favicon = LanRoomFaviconCache.texture(minecraft, room.key().toString(), room.favicon());
+        String roomAddress = room.key() == null ? "" : room.key().toString();
+        Identifier favicon = LanRoomFaviconCache.texture(minecraft, roomAddress, room.favicon());
         if (favicon != null) {
             graphics.blit(RenderPipelines.GUI_TEXTURED, favicon, coverX, coverY,
                     0.0F, 0.0F, 64, 64, 64, 64);
@@ -170,7 +172,7 @@ public final class LanRoomContextScreen extends Screen {
         drawRoomLine(graphics, "screen.radminlan.room_lan_motd", room.motd(), textX, y + 35);
         drawRoomLine(graphics, "screen.radminlan.room_server_motd",
                 room.displayMotd(), textX, y + 49);
-        drawRoomLine(graphics, "screen.radminlan.room_address", room.key().toString(), textX, y + 63);
+        drawRoomLine(graphics, "screen.radminlan.room_address", roomAddress, textX, y + 63);
         drawRoomLine(graphics, "screen.radminlan.room_players", formatPlayers(), textX, y + 77);
         drawRoomLine(graphics, "screen.radminlan.room_latency", formatLatency(), textX, y + 91);
 
@@ -191,7 +193,7 @@ public final class LanRoomContextScreen extends Screen {
         drawRoomLine(graphics, "screen.radminlan.room_state", peerState, leftX, y + 170);
         drawRoomLine(graphics, "screen.radminlan.room_version", peerValue(peer == null ? "" : peer.version()), rightX, y + 170);
 
-        String networkText = networks.stream().map(RadminBackend.Network::name)
+        String networkText = networks.stream().filter(network -> network != null).map(RadminBackend.Network::name)
                 .filter(value -> value != null && !value.isBlank()).distinct()
                 .reduce((a, b) -> a + ", " + b)
                 .orElse(peer == null ? valueUnknown() : peerValue(peer.networkName()));

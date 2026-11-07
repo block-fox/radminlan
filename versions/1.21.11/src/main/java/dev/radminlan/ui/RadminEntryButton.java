@@ -5,10 +5,9 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import net.minecraft.client.Minecraft;
 
 /** Vanilla button surface with the Radmin VPN shield layered over the left edge. */
-public final class RadminEntryButton extends Button {
+public final class RadminEntryButton extends Button.Plain {
     private static final Identifier ICON = Identifier.fromNamespaceAndPath("radminlan", "textures/radmin_pixel.png");
 
     public RadminEntryButton(int x, int y, int width, int height, Component message, Runnable action) {
@@ -18,9 +17,7 @@ public final class RadminEntryButton extends Button {
 
     @Override
     protected void renderContents(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
-        graphics.drawCenteredString(Minecraft.getInstance().font, getMessage(),
-                getX() + getWidth() / 2 + 5, getY() + (getHeight() - 8) / 2,
-                active ? 0xFFFFFFFF : 0xFFA0A0A0);
+        super.renderContents(graphics, mouseX, mouseY, delta);
         int iconSize = Math.min(16, getHeight() - 4);
         graphics.blit(RenderPipelines.GUI_TEXTURED, ICON, getX() + 4, getY() + (getHeight() - iconSize) / 2,
                 0.0F, 0.0F, iconSize, iconSize, 16, 16, 16, 16);

@@ -7,6 +7,8 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+import java.util.List;
+
 /** Full-screen properties page for a Radmin peer. */
 public final class PeerDetailsScreen extends Screen {
     private final Screen parent;
@@ -21,9 +23,9 @@ public final class PeerDetailsScreen extends Screen {
     private String[] cachedConnectionCopyValues;
 
     public PeerDetailsScreen(Screen parent, RadminBackend.Peer peer) {
-        super(Component.translatable("screen.radminlan.properties").append(": ").append(peer.name()));
+        super(Component.translatable("screen.radminlan.properties").append(": ").append(peer == null || peer.name() == null ? "" : peer.name()));
         this.parent = parent;
-        this.peer = peer;
+        this.peer = peer == null ? new RadminBackend.Peer("", "", "", -1, false) : peer;
     }
 
     @Override
@@ -40,7 +42,7 @@ public final class PeerDetailsScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
         ensureCachedValues();
-        renderBackground(graphics, mouseX, mouseY, delta);
+        renderTransparentBackground(graphics);
         graphics.fill(0, 0, width, height, 0xB0000000);
         graphics.drawCenteredString(font, Component.literal(truncate(title.getString(), width - 32)), width / 2, 8, 0xFFFFFFFF);
         graphics.blitSprite(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
@@ -102,7 +104,7 @@ public final class PeerDetailsScreen extends Screen {
 
     @Override
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        if (event.button() == 1) {
+        if (event.button() == 0) {
             int panelWidth = Math.min(620, width - 32);
             int x = (width - panelWidth) / 2;
             int y = Math.max(40, (height - 252) / 2);
@@ -141,13 +143,17 @@ public final class PeerDetailsScreen extends Screen {
         RadminBackend.RadminSnapshot snapshot = RadminLanClient.cachedSnapshot();
         if (cachedIdentityValues != null && cachedNetworkSnapshot == snapshot) return;
         cachedNetworkSnapshot = snapshot;
-        String names = snapshot == null ? peer.networkName() : snapshot.networks().stream()
-                .filter(network -> network.peers().stream().anyMatch(candidate -> samePeer(candidate, peer)))
+        List<RadminBackend.Network> networks = snapshot == null || snapshot.networks() == null
+                ? List.of() : snapshot.networks();
+        String names = snapshot == null ? safe(peer.networkName()) : networks.stream()
+                .filter(network -> network != null && network.peers() != null
+                        && network.peers().stream().anyMatch(candidate -> candidate != null && samePeer(candidate, peer)))
                 .map(RadminBackend.Network::name)
+                .filter(name -> name != null && !name.isBlank())
                 .distinct()
                 .reduce((left, right) -> left + ", " + right)
                 .orElse("");
-        String networkNames = names.isBlank() ? peer.networkName() : names;
+        String networkNames = names.isBlank() ? safe(peer.networkName()) : names;
         String role = peer.role() == null ? emptyValue() : Component.translatable(switch (peer.role().intValue()) {
             case 1 -> "screen.radminlan.role_member";
             case 2 -> "screen.radminlan.role_admin";
@@ -169,12 +175,16 @@ public final class PeerDetailsScreen extends Screen {
     }
 
     private static boolean samePeer(RadminBackend.Peer left, RadminBackend.Peer right) {
+        if (left == null || right == null) return false;
         if (left.nodeId() >= 0 && right.nodeId() >= 0) return left.nodeId() == right.nodeId();
-        return !left.virtualIp().isBlank() && left.virtualIp().equalsIgnoreCase(right.virtualIp());
+        String leftIp = safe(left.virtualIp());
+        String rightIp = safe(right.virtualIp());
+        return !leftIp.isBlank() && leftIp.equalsIgnoreCase(rightIp);
     }
 
     private static String emptyDash(String value) { return value == null || value.isBlank() ? "-" : value; }
     private static String emptyText(String value) { return value == null ? "" : value; }
+    private static String safe(String value) { return value == null ? "" : value; }
     private static String emptyValue() { return Component.translatable("screen.radminlan.property.not_provided").getString(); }
     private String truncate(String value, int maxWidth) {
         if (value == null || font.width(value) <= maxWidth) return value == null ? "" : value;
