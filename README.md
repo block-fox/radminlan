@@ -1,10 +1,8 @@
 # RadminLAN
 
-RadminLAN 是一个面向 Fabric 26.3 的客户端模组，用于在 Minecraft 内查看 Radmin LAN/VPN 状态、网络和用户，并集中管理局域网房间。
+RadminLAN 是一个面向 Fabric 1.21.11+ 的客户端模组，后续可能移植（neo）forge，用于在 Minecraft 内查看 Radmin LAN/VPN 状态、网络和用户，并集中管理局域网房间。
 
 当前版本：`0.1.2`
-
-作者：flexfox0424（GitHub: block-fox）
 
 ## 已实现
 
