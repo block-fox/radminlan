@@ -1,6 +1,7 @@
 package dev.radminlan.mixin;
 
 import dev.radminlan.RadminLanClient;
+import dev.radminlan.input.MouseButtons;
 import dev.radminlan.network.RadminBackend;
 import dev.radminlan.room.LanRoomFaviconCache;
 import dev.radminlan.room.LanRoomLayout;
@@ -45,14 +46,17 @@ public abstract class LanServerEntryMixin {
     private long radminlan$cachedFaviconGeneration = -1L;
     private String radminlan$cachedRoomAddress;
     private RoomKey radminlan$cachedRoomKey;
+    private RadminBackend.RadminSnapshot radminlan$cachedPeerSnapshot;
+    private String radminlan$cachedPeerIp;
+    private RadminBackend.Peer radminlan$cachedPeer;
 
-    @Redirect(method = "extractContent", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;text(Lnet/minecraft/client/gui/Font;Lnet/minecraft/network/chat/Component;III)V"))
+    @Redirect(method = "extractContent", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;text(Lnet/minecraft/client/gui/Font;Lnet/minecraft/network/chat/Component;III)V", ordinal = 0))
     private void radminlan$replaceLanHeader(GuiGraphicsExtractor graphics, Font font, Component header,
                                              int x, int y, int color) {
-        // Keep the vanilla LAN title.  Earlier versions replaced this line with
-        // the advertised MOTD, which removed the visual anchor and let the
-        // player/ping columns overlap the first line of text.
-        graphics.text(font, header, x, y, color);
+        RoomKey key = radminlan$cachedRoomKey(serverData.getAddress());
+        Component title = radminlan$matchingPeer(key) == null ? header
+                : Component.translatable("screen.radminlan.radmin_lan_world");
+        graphics.text(font, title, x, y, color);
     }
 
     @Redirect(method = "extractContent", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;text(Lnet/minecraft/client/gui/Font;Ljava/lang/String;III)V"))
@@ -142,12 +146,13 @@ public abstract class LanServerEntryMixin {
         ServerSelectionList.Entry entry = (ServerSelectionList.Entry)(Object)this;
         boolean onRow = event.x() >= entry.getContentX() && event.x() <= entry.getContentRight()
                 && event.y() >= entry.getContentY() && event.y() <= entry.getContentY() + LanRoomLayout.ROW_HEIGHT;
-        // Minecraft 26.3 uses button 1 for left click and button 3 for right click.
+        // Minecraft 26.2 uses button 0 for left click and button 1 for right click;
+        // 26.3 moved those ids to 1 and 3.
         // Keep ordinary left-clicks on the row for vanilla server joining;
         // only the three-dot control and an explicit right-click open our menu.
-        if (event.button() == 1) return;
-        if (event.button() == 3 && !onRow) return;
-        if (event.button() != 1 && event.button() != 3) return;
+        if (event.button() == MouseButtons.left()) return;
+        if (event.button() == MouseButtons.right() && !onRow) return;
+        if (event.button() != MouseButtons.left() && event.button() != MouseButtons.right()) return;
 
         RoomKey key = radminlan$roomKey(serverData.getAddress());
         LanRoomSnapshot room = key == null || RadminLanClient.ROOMS == null ? null : RadminLanClient.ROOMS.get(key);
@@ -180,12 +185,28 @@ public abstract class LanServerEntryMixin {
     }
 
     private RadminBackend.Peer radminlan$matchingPeer(LanRoomSnapshot room) {
-        if (room == null) return null;
+        return room == null ? null : radminlan$matchingPeer(room.key());
+    }
+
+    private RadminBackend.Peer radminlan$matchingPeer(RoomKey key) {
         RadminBackend.RadminSnapshot snapshot = RadminLanClient.cachedSnapshot();
-        if (snapshot.state() != RadminBackend.ServiceState.READY) return null;
+        String ip = key == null ? "" : key.ip();
+        if (snapshot == radminlan$cachedPeerSnapshot && Objects.equals(ip, radminlan$cachedPeerIp)) {
+            return radminlan$cachedPeer;
+        }
+        radminlan$cachedPeerSnapshot = snapshot;
+        radminlan$cachedPeerIp = ip;
+        radminlan$cachedPeer = radminlan$findMatchingPeer(snapshot, key);
+        return radminlan$cachedPeer;
+    }
+
+    private static RadminBackend.Peer radminlan$findMatchingPeer(RadminBackend.RadminSnapshot snapshot, RoomKey key) {
+        if (key == null || key.ip().isBlank() || snapshot == null
+                || snapshot.state() != RadminBackend.ServiceState.READY) return null;
         return snapshot.networks().stream()
                 .flatMap(network -> network.peers().stream())
-                .filter(peer -> room.key().ip().equalsIgnoreCase(peer.virtualIp()))
+                .filter(peer -> key.ip().equalsIgnoreCase(peer.virtualIp())
+                        || key.ip().equalsIgnoreCase(peer.virtualIpv6()))
                 .findFirst()
                 .orElse(null);
     }

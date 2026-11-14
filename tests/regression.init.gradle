@@ -1,0 +1,31 @@
+allprojects {
+    afterEvaluate {
+        def regressionSources = file(project.minecraft_version.toString() == '1.21.11'
+                ? '../../tests/regression' : 'tests/regression')
+        def regressionClasses = layout.buildDirectory.dir('classes/regression')
+        def regressionWork = file('.tmp/regression-runtime').absolutePath
+        tasks.register('compileUiRegression', JavaCompile) {
+            dependsOn tasks.named('classes')
+            source = fileTree(regressionSources) { include '*.java' }
+            classpath = sourceSets.main.runtimeClasspath
+            destinationDirectory = regressionClasses
+            options.release = project.minecraft_version.toString() == '1.21.11' ? 21 : 25
+        }
+        tasks.register('uiRegressionCheck', JavaExec) {
+            dependsOn tasks.named('compileUiRegression')
+            classpath = files(regressionClasses) + sourceSets.main.runtimeClasspath
+            mainClass = 'UiRegressionCheck'
+            args project.minecraft_version.toString()
+            systemProperty 'uiRegression.workDir', regressionWork
+            doFirst { new File(regressionWork).mkdirs() }
+        }
+        tasks.register('nativeTelemetrySmoke', JavaExec) {
+            dependsOn tasks.named('compileUiRegression')
+            classpath = files(regressionClasses) + sourceSets.main.runtimeClasspath
+            mainClass = 'NativeTelemetrySmoke'
+            jvmArgs '--enable-native-access=ALL-UNNAMED'
+            systemProperty 'uiRegression.workDir', regressionWork
+            doFirst { new File(regressionWork).mkdirs() }
+        }
+    }
+}

@@ -1,9 +1,11 @@
 package dev.radminlan.ui;
 
 import dev.radminlan.network.RadminBackend;
+import dev.radminlan.input.MouseButtons;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 import java.util.List;
@@ -78,8 +80,8 @@ public final class NetworkPropertiesScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        if (event.button() == 0 && minecraft != null) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (event.button() == MouseButtons.left() && minecraft != null) {
             int x = panelX();
             int y = panelY();
             String value = valueAt(x, y, (int) event.x(), (int) event.y());

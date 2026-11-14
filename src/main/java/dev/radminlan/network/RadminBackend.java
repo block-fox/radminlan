@@ -24,6 +24,10 @@ public interface RadminBackend extends AutoCloseable {
     record RadminSnapshot(ServiceState state, String localName, String virtualIp,
                           List<Network> networks, String message, boolean canWrite,
                           String transport, Boolean power) {
+        public RadminSnapshot {
+            networks = networks == null ? List.of() : List.copyOf(networks);
+        }
+
         public RadminSnapshot(ServiceState state, String localName, String virtualIp,
                               List<Network> networks, String message, boolean canWrite,
                               String transport) {

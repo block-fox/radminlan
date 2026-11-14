@@ -10,10 +10,13 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /** Connection to the official Windows Radmin control pipe. */
 public final class RadminPipeClient implements AutoCloseable {
@@ -30,8 +33,70 @@ public final class RadminPipeClient implements AutoCloseable {
         t.setDaemon(true);
         return t;
     });
+    private final ExecutorService updates = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "radminlan-pipe-updates");
+        t.setDaemon(true);
+        return t;
+    });
+    private final AtomicBoolean updatesStarted = new AtomicBoolean();
+    private volatile boolean closed;
 
     public RadminPipeClient(String pipeName) { this.pipeName = pipeName; }
+
+    /** Keeps the service's unsolicited peer updates flowing between explicit refreshes. Never writes to the pipe. */
+    public void startPeerUpdates(Consumer<byte[]> frames, Runnable disconnected) {
+        if (closed || !updatesStarted.compareAndSet(false, true)) return;
+        updates.execute(() -> {
+            while (!closed && !Thread.currentThread().isInterrupted()) {
+                try (WinPipe connected = WinPipe.open(pipeName, GENERIC_READ)) {
+                    readUpdates(connected, frames);
+                } catch (IOException | RuntimeException ignored) {
+                    // A service restart or unavailable pipe is retried without
+                    // retaining measurements from the previous connection.
+                } finally {
+                    disconnected.run();
+                }
+                if (closed || Thread.currentThread().isInterrupted()) return;
+                try { Thread.sleep(500); }
+                catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        });
+    }
+
+    private void readUpdates(WinPipe pipe, Consumer<byte[]> frames) throws IOException {
+        ByteArrayOutputStream pending = new ByteArrayOutputStream();
+        while (!closed && !Thread.currentThread().isInterrupted()) {
+            int available = pipe.availableBytes();
+            if (available == 0) {
+                try { Thread.sleep(16); }
+                catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                continue;
+            }
+            byte[] chunk = pipe.read(Math.min(64 * 1024, available));
+            if (pending.size() + chunk.length > MAX_RESPONSE_SIZE) {
+                throw new IOException("Radmin pipe update exceeds 8 MiB");
+            }
+            pending.write(chunk);
+            byte[] bytes = pending.toByteArray();
+            int offset = 0;
+            while (offset + 4 <= bytes.length) {
+                int length = RadminWire.readIntLE(bytes, offset);
+                if (length <= 0 || length > MAX_RESPONSE_SIZE) throw new IOException("Invalid Radmin update frame");
+                if (offset + 4L + length > bytes.length) break;
+                offset += 4 + length;
+            }
+            if (offset == 0) continue;
+            frames.accept(Arrays.copyOf(bytes, offset));
+            pending.reset();
+            pending.write(bytes, offset, bytes.length - offset);
+        }
+    }
 
     public ReadResult readInitialFrames(Duration timeout) throws Exception {
         Future<ReadResult> future = reader.submit(() -> {
@@ -124,7 +189,11 @@ public final class RadminPipeClient implements AutoCloseable {
         return all.toByteArray();
     }
 
-    @Override public void close() { reader.shutdownNow(); }
+    @Override public void close() {
+        closed = true;
+        updates.shutdownNow();
+        reader.shutdownNow();
+    }
 
     public record ReadResult(byte[] bytes, boolean canWrite, String transport) {}
 

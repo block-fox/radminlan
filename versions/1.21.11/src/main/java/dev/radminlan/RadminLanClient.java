@@ -4,6 +4,7 @@ import dev.radminlan.config.RadminConfig;
 import dev.radminlan.network.RadminBackend;
 import dev.radminlan.network.RadminBackends;
 import dev.radminlan.room.LanRoomRepository;
+import dev.radminlan.ui.RadminScreen;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -35,10 +36,17 @@ public final class RadminLanClient implements ClientModInitializer {
         BACKEND = RadminBackends.create(CONFIG);
         ROOMS = new LanRoomRepository(CONFIG);
         refreshSnapshot();
-        int[] ticksUntilRefresh = {100};
+        int[] ticksSinceRefresh = {0};
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (--ticksUntilRefresh[0] <= 0) {
-                ticksUntilRefresh[0] = 100;
+            // The management screen owns its refresh cadence while open.
+            // Reset the background timer while paused so leaving the screen
+            // does not immediately repeat its most recent request.
+            if (!CONFIG.autoRefresh || client.screen instanceof RadminScreen) {
+                ticksSinceRefresh[0] = 0;
+                return;
+            }
+            if (++ticksSinceRefresh[0] >= CONFIG.getRefreshIntervalTicks()) {
+                ticksSinceRefresh[0] = 0;
                 refreshSnapshot();
             }
         });

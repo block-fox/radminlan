@@ -21,6 +21,7 @@ public final class PipeRadminBackend implements RadminBackend {
     private static final long JOIN_CONFIRM_DELAY_MS = 350L;
     private final RadminConfig config;
     private final RadminPipeClient pipe;
+    private final RadminPeerTelemetry peerTelemetry = new RadminPeerTelemetry();
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "radminlan-pipe-backend");
         t.setDaemon(true);
@@ -34,6 +35,7 @@ public final class PipeRadminBackend implements RadminBackend {
     public PipeRadminBackend(RadminConfig config) {
         this.config = config;
         this.pipe = new RadminPipeClient(config.pipeName);
+        this.pipe.startPeerUpdates(peerTelemetry::accept, peerTelemetry::clear);
     }
 
     @Override public CompletableFuture<RadminSnapshot> snapshot() {
@@ -69,7 +71,7 @@ public final class PipeRadminBackend implements RadminBackend {
             RadminPipeClient.ReadResult result = pipe.readInitialFrames(
                     Duration.ofMillis(Math.max(1000, config.pipeTimeoutMs)));
             pipeCanWrite = result.canWrite();
-            return RadminSnapshotParser.parse(result.bytes(), result.canWrite(), result.transport());
+            return peerTelemetry.enrich(RadminSnapshotParser.parse(result.bytes(), result.canWrite(), result.transport()));
         } catch (Exception e) {
             return RadminSnapshot.unavailable(message(e));
         }

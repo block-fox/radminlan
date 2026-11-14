@@ -1,12 +1,12 @@
 package dev.radminlan.ui;
 
 import dev.radminlan.RadminLanClient;
+import dev.radminlan.input.MouseButtons;
 import dev.radminlan.network.RadminBackend;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.InputWithModifiers;
@@ -24,13 +24,12 @@ import java.util.concurrent.CompletableFuture;
 public final class PublicNetworksScreen extends Screen {
     private static final int ROW_HEIGHT = 24;
     private static final int FOOTER = 42;
-    // Keep the first row below the search controls. Rows are added after the
-    // controls in the widget stack, so a too-small top margin lets them paint
-    // over the search box when the directory is large.
+    // The list starts immediately below the header separator. Partially
+    // visible rows are clipped here as they scroll behind the header/footer.
     private static final int TOP = 70;
 
     private final RadminScreen parent;
-    private final List<GuiEventListener> rows = new ArrayList<>();
+    private final List<PublicNetworkRow> rows = new ArrayList<>();
     private List<String> networks = List.of();
     private final Set<String> selected = new HashSet<>();
     private EditBox searchBox;
@@ -83,11 +82,13 @@ public final class PublicNetworksScreen extends Screen {
                 .bounds(invertX, 40, invertWidth, 20).build();
         invertButton.visible = !selected.isEmpty();
         addRenderableWidget(invertButton);
+        int footerButtonWidth = Math.min(104, Math.max(1, (width - 48) / 2));
+        int footerStartX = (width - (footerButtonWidth * 2 + 8)) / 2;
         joinButton = Button.builder(Component.translatable("screen.radminlan.join"), button -> joinSelected())
-                .bounds(width - 236, height - 30, 104, 20).build();
+                .bounds(footerStartX + footerButtonWidth + 8, height - 30, footerButtonWidth, 20).build();
         addRenderableWidget(joinButton);
         addRenderableWidget(Button.builder(Component.translatable("screen.radminlan.cancel"), button -> onClose())
-                .bounds(20, height - 30, 104, 20).build());
+                .bounds(footerStartX, height - 30, footerButtonWidth, 20).build());
         updateSelectionControls();
         rebuildRows();
         if (networks.isEmpty() && !loading) loadNetworks("");
@@ -179,16 +180,18 @@ public final class PublicNetworksScreen extends Screen {
     }
 
     private void rebuildRows() {
-        for (GuiEventListener row : List.copyOf(rows)) removeWidget(row);
+        for (PublicNetworkRow row : List.copyOf(rows)) removeWidget(row);
         rows.clear();
         clampScroll();
         List<String> filtered = filteredNetworks();
         for (int i = 0; i < filtered.size(); i++) {
             int y = listTop() + i * ROW_HEIGHT - scrollOffset;
-            if (y + ROW_HEIGHT < listTop() || y > listBottom()) continue;
+            if (y + ROW_HEIGHT <= listTop() || y >= listBottom()) continue;
             PublicNetworkRow row = new PublicNetworkRow(20, y, width - 44, ROW_HEIGHT - 2, filtered.get(i));
             rows.add(row);
-            addRenderableWidget(row);
+            // Keep rows in the input/narration lists; the screen extracts the
+            // complete widgets once inside its list scissor below.
+            addWidget(row);
         }
     }
 
@@ -220,7 +223,7 @@ public final class PublicNetworksScreen extends Screen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (event.button() == 1 && event.x() >= width - 18 && event.x() <= width - 4 && event.y() >= listTop() && event.y() <= listBottom() && maxScroll() > 0) {
+        if (event.button() == MouseButtons.left() && event.x() >= width - 18 && event.x() <= width - 4 && event.y() >= listTop() && event.y() < listBottom() && maxScroll() > 0) {
             draggingScrollbar = true;
             dragGrabOffset = Math.max(0, (int) event.y() - thumbY());
             return true;
@@ -242,7 +245,7 @@ public final class PublicNetworksScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (mouseY < listTop() || mouseY > listBottom()) return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+        if (mouseY < listTop() || mouseY >= listBottom()) return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
         int next = Math.max(0, Math.min(maxScroll(), scrollOffset - (verticalAmount > 0 ? ROW_HEIGHT * 3 : -ROW_HEIGHT * 3)));
         if (next == scrollOffset) return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
         scrollOffset = next;
@@ -258,29 +261,42 @@ public final class PublicNetworksScreen extends Screen {
         graphics.centeredText(font, title, width / 2, 12, 0xFFFFFFFF);
         graphics.text(font, status, 20, 24, 0xFFB9C2CA);
         graphics.enableScissor(20, listTop(), width - 20, listBottom());
-        if (filteredNetworks().isEmpty()) {
-            String emptyKey = loading ? "screen.radminlan.public_networks_loading" : failed ? "screen.radminlan.public_networks_failed" : "screen.radminlan.public_networks_empty";
-            graphics.text(font, Component.translatable(emptyKey), 30, listTop() + 8, 0xFFAAAAAA);
+        try {
+            if (filteredNetworks().isEmpty()) {
+                String emptyKey = loading ? "screen.radminlan.public_networks_loading" : failed ? "screen.radminlan.public_networks_failed" : "screen.radminlan.public_networks_empty";
+                graphics.text(font, Component.translatable(emptyKey), 30, listTop() + 8, 0xFFAAAAAA);
+            }
+            for (PublicNetworkRow row : rows) row.extractRenderState(graphics, mouseX, mouseY, delta);
+        } finally {
+            graphics.disableScissor();
         }
-        graphics.disableScissor();
         if (maxScroll() > 0) {
             graphics.fill(width - 11, listTop(), width - 7, listBottom(), 0x66404040);
             graphics.fill(width - 11, thumbY(), width - 7, thumbY() + thumbHeight(), 0xFFB0B0B0);
         }
-        graphics.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, Screen.HEADER_SEPARATOR, 20, height - FOOTER, 0.0F, 0.0F, width - 40, 2, 32, 2);
         super.extractRenderState(graphics, mouseX, mouseY, delta);
+        graphics.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, Screen.HEADER_SEPARATOR,
+                0, listTop() - 2, 0.0F, 0.0F, width, 2, 32, 2);
+        graphics.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, Screen.FOOTER_SEPARATOR,
+                0, listBottom(), 0.0F, 0.0F, width, 2, 32, 2);
     }
 
     private int listTop() { return TOP; }
-    private int listBottom() { return Math.max(listTop() + 1, height - FOOTER - 8); }
+    private int listBottom() { return Math.max(listTop() + 1, height - FOOTER); }
     private int maxScroll() { return Math.max(0, filteredNetworks().size() * ROW_HEIGHT - (listBottom() - listTop())); }
     private void clampScroll() { scrollOffset = Math.min(scrollOffset, maxScroll()); }
-    private int thumbHeight() { int view = Math.max(1, listBottom() - listTop()); return Math.max(18, view * view / Math.max(view, filteredNetworks().size() * ROW_HEIGHT)); }
+    private int thumbHeight() { int view = Math.max(1, listBottom() - listTop()); return Math.min(view, Math.max(18, view * view / Math.max(view, filteredNetworks().size() * ROW_HEIGHT))); }
     private int thumbY() { int track = Math.max(0, listBottom() - listTop() - thumbHeight()); return listTop() + (maxScroll() == 0 ? 0 : track * scrollOffset / maxScroll()); }
 
     private final class PublicNetworkRow extends AbstractButton {
         private final String name;
         private PublicNetworkRow(int x, int y, int width, int height, String name) { super(x, y, width, height, Component.literal(name)); this.name = name; }
+        @Override public boolean isMouseOver(double mouseX, double mouseY) {
+            return mouseY >= listTop() && mouseY < listBottom() && super.isMouseOver(mouseX, mouseY);
+        }
+        @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+            return isMouseOver(event.x(), event.y()) && super.mouseClicked(event, doubleClick);
+        }
         @Override public void onPress(InputWithModifiers input) {
             if (input.hasShiftDown() && !anchorName.isBlank()) {
                 List<String> all = filteredNetworks();

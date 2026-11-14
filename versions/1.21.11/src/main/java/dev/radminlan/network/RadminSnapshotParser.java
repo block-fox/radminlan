@@ -24,24 +24,38 @@ public final class RadminSnapshotParser {
     private static final int VIRTUAL_IP = 0x05;
     private static final int NETWORK_TYPE = 0x0A;
     private static final int NETWORK_FLAGS = 0xA3;
+    private static final int NODE_ATTRIBUTES = 0xA0;
+    private static final int NODE_LATENCY = 0x4D;
+    private static final int LATENCY_MESSAGE = 28;
 
     private RadminSnapshotParser() {}
 
     public static RadminBackend.RadminSnapshot parse(byte[] raw, boolean canWrite, String transport) {
         List<NetworkSeed> seeds = new ArrayList<>();
         Map<Long, Profile> profiles = new HashMap<>();
+        Map<Long, Long> attributes = new HashMap<>();
+        Map<Long, Long> latencies = new HashMap<>();
         Local local = new Local();
-        for (byte[] frame : RadminWire.splitFrames(raw)) walk(RadminWire.parseFrame(frame), 0, seeds, profiles, local);
+        for (byte[] frame : RadminWire.splitFrames(raw)) {
+            List<RadminWire.Field> fields = RadminWire.parseFrame(frame);
+            collectTelemetry(fields, attributes, latencies);
+            walk(fields, 0, false, seeds, profiles, local);
+        }
         if (seeds.isEmpty()) {
             List<RadminWire.Field> fallback = RadminWire.parseFrame(raw);
-            walk(fallback, 0, seeds, profiles, local);
+            collectTelemetry(fallback, attributes, latencies);
+            walk(fallback, 0, false, seeds, profiles, local);
         }
         List<RadminBackend.Network> networks = new ArrayList<>();
         for (NetworkSeed seed : seeds) {
             List<RadminBackend.Peer> peers = new ArrayList<>();
             for (long nodeId : seed.members) {
-                Profile p = profiles.getOrDefault(nodeId, new Profile(nodeId, "#" + nodeId, "", "", "", -1, -1, -1, ""));
-                peers.add(new RadminBackend.Peer(p.name(), p.virtualIp(), p.virtualIpv6(), p.state(), p.latency(), p.online(),
+                Profile p = profiles.getOrDefault(nodeId, new Profile(nodeId, "#" + nodeId, "", "", "", -1, -1, ""));
+                long flags = attributes.getOrDefault(nodeId, p.attributes());
+                boolean online = flags >= 0 && (flags & 1) != 0;
+                String peerState = flags < 0 ? "unknown" : online ? "online" : "offline";
+                long latency = online ? latencies.getOrDefault(nodeId, -1L) : -1L;
+                peers.add(new RadminBackend.Peer(p.name(), p.virtualIp(), p.virtualIpv6(), peerState, latency, online,
                         p.nodeId(), p.publicIp(), p.connectionType(), seed.name, seed.memberRoles.get(nodeId), p.version()));
             }
             Long localRole = local.nodeId < 0 ? null : seed.memberRoles.get(local.nodeId);
@@ -60,7 +74,7 @@ public final class RadminSnapshotParser {
                 local.name, local.virtualIp, networks, "", canWrite, transport, local.power);
     }
 
-    private static void walk(List<RadminWire.Field> fields, int depth, List<NetworkSeed> seeds,
+    private static void walk(List<RadminWire.Field> fields, int depth, boolean localFields, List<NetworkSeed> seeds,
                              Map<Long, Profile> profiles, Local local) {
         Long node = number(fields, NODE_ID);
         String alias = text(fields, SELF_ALIAS);
@@ -68,7 +82,7 @@ public final class RadminSnapshotParser {
         String publicIp = text(fields, PUBLIC_IP);
         String virtualIp = ipv4(fields, VIRTUAL_IP);
         String virtualIpv6 = ipv6(fields, VIRTUAL_IP);
-        if (node != null && depth <= 1) {
+        if (node != null && localFields) {
             local.nodeId = node;
             local.name = firstNonBlank(alias, local.name);
             local.virtualIp = firstNonBlank(virtualIp, local.virtualIp);
@@ -84,7 +98,7 @@ public final class RadminSnapshotParser {
             else if (field.id() == PROFILE_CONTAINER) {
                 Profile profile = parseProfile(field.children());
                 if (profile.nodeId >= 0) profiles.put(profile.nodeId, profile);
-            } else walk(field.children(), depth + 1, seeds, profiles, local);
+            } else walk(field.children(), depth + 1, field.id() == 0x20, seeds, profiles, local);
         }
     }
 
@@ -195,17 +209,36 @@ public final class RadminSnapshotParser {
         String virtualIp = ipv4(children, VIRTUAL_IP);
         String virtualIpv6 = ipv6(children, VIRTUAL_IP);
         if (virtualIp.isBlank()) virtualIp = validIpv4(alias);
-        long status = unsignedValue(number(children, 0x21, -1));
+        long status = unsignedValue(scalarOr(children, NODE_ATTRIBUTES, -1));
         long channel = number(children, 0x26, -1);
-        long latency = unsignedValue(number(children, 0x3E, -1));
         String version = text(children, 0xED, "");
-        return new Profile(node == null ? -1 : node, alias, publicIp, virtualIp, virtualIpv6, status, channel, latency, version);
+        return new Profile(node == null ? -1 : node, alias, publicIp, virtualIp, virtualIpv6, status, channel, version);
     }
 
     private static Profile profile(List<RadminWire.Field> fields, String alias, String publicIp, String virtualIp, String virtualIpv6) {
         return new Profile(number(fields, NODE_ID, -1), alias, publicIp, virtualIp, virtualIpv6,
-                unsignedValue(number(fields, 0x21, -1)), number(fields, 0x26, -1),
-                unsignedValue(number(fields, 0x3E, -1)), text(fields, 0xED, ""));
+                unsignedValue(scalarOr(fields, NODE_ATTRIBUTES, -1)), number(fields, 0x26, -1), text(fields, 0xED, ""));
+    }
+
+    private static long scalarOr(List<RadminWire.Field> fields, int id, long fallback) {
+        Long value = scalar(fields, id);
+        return value == null ? fallback : value;
+    }
+
+    /** The official GUI reads online from attribute bit 0 and ping from message 28 / field 0x4D. */
+    static void collectTelemetry(List<RadminWire.Field> fields, Map<Long, Long> attributes,
+                                         Map<Long, Long> latencies) {
+        Long nodeId = number(fields, NODE_ID);
+        Long flags = scalar(fields, NODE_ATTRIBUTES);
+        if (nodeId != null && flags != null) attributes.put(nodeId, unsignedValue(flags));
+        Long message = scalar(fields, 0x01);
+        Long latency = scalar(fields, NODE_LATENCY);
+        if (nodeId != null && message != null && message == LATENCY_MESSAGE && latency != null) {
+            latencies.put(nodeId, unsignedValue(latency));
+        }
+        for (RadminWire.Field field : fields) {
+            if (field.isContainer()) collectTelemetry(field.children(), attributes, latencies);
+        }
     }
 
     private static long unsignedValue(long value) { return value == 0xFFFF_FFFFL ? -1 : value; }
@@ -269,10 +302,22 @@ public final class RadminSnapshotParser {
     }
 
     private static String validIpv4(String value) {
-        if (value.isBlank()) return "";
-        String[] parts = value.split("\\.");
+        if (value == null || value.isBlank()) return "";
+        String[] parts = value.split("\\.", -1);
         if (parts.length != 4) return "";
-        int first = Integer.parseInt(parts[0]);
+        int first = -1;
+        for (int part = 0; part < parts.length; part++) {
+            String digits = parts[part];
+            if (digits.isEmpty() || digits.length() > 3) return "";
+            int octet = 0;
+            for (int index = 0; index < digits.length(); index++) {
+                char digit = digits.charAt(index);
+                if (digit < '0' || digit > '9') return "";
+                octet = octet * 10 + digit - '0';
+            }
+            if (octet > 255) return "";
+            if (part == 0) first = octet;
+        }
         boolean unspecified = value.equals("0.0.0.0") || value.equals("255.255.255.255");
         boolean multicast = first >= 224;
         return unspecified || multicast ? "" : value;
@@ -290,9 +335,7 @@ public final class RadminSnapshotParser {
                                Integer networkType, Boolean enabled, Boolean allowPasswordless,
                                Boolean blockNewMembers) {}
     private record Profile(long nodeId, String name, String publicIp, String virtualIp, String virtualIpv6,
-                           long status, long channel, long latency, String version) {
-        String state() { return status == 0 ? "offline" : status == 1 ? "online" : "unknown"; }
-        boolean online() { return status == 1; }
+                           long attributes, long channel, String version) {
         String connectionType() {
             return switch ((int) channel) {
                 case 1 -> "UDP/nat";

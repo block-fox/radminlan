@@ -1,10 +1,13 @@
 package dev.radminlan.ui;
 
 import dev.radminlan.RadminLanClient;
+import dev.radminlan.input.MouseButtons;
 import dev.radminlan.network.RadminBackend;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 
 import java.util.List;
@@ -13,6 +16,7 @@ import java.util.List;
 public final class PeerDetailsScreen extends Screen {
     private final Screen parent;
     private final RadminBackend.Peer peer;
+    private RadminBackend.Peer displayedPeer;
     private String copyStatus = "";
     private RadminBackend.RadminSnapshot cachedNetworkSnapshot;
     private String[] cachedIdentityValues;
@@ -23,9 +27,11 @@ public final class PeerDetailsScreen extends Screen {
     private String[] cachedConnectionCopyValues;
 
     public PeerDetailsScreen(Screen parent, RadminBackend.Peer peer) {
-        super(Component.translatable("screen.radminlan.properties").append(": ").append(peer == null || peer.name() == null ? "" : peer.name()));
+        super(Component.translatable("screen.radminlan.properties").append(": ")
+                .append(peer == null || peer.name() == null ? "" : peer.name()));
         this.parent = parent;
         this.peer = peer == null ? new RadminBackend.Peer("", "", "", -1, false) : peer;
+        this.displayedPeer = this.peer;
     }
 
     @Override
@@ -45,7 +51,8 @@ public final class PeerDetailsScreen extends Screen {
         renderTransparentBackground(graphics);
         graphics.fill(0, 0, width, height, 0xB0000000);
         graphics.drawCenteredString(font, Component.literal(truncate(title.getString(), width - 32)), width / 2, 8, 0xFFFFFFFF);
-        graphics.fill(0, 29, width, 31, 0xFF555555);
+        graphics.blit(RenderPipelines.GUI_TEXTURED, Screen.HEADER_SEPARATOR, 0, 29,
+                0.0F, 0.0F, width, 2, 32, 2);
 
         int panelWidth = Math.min(620, width - 32);
         int x = (width - panelWidth) / 2;
@@ -74,9 +81,9 @@ public final class PeerDetailsScreen extends Screen {
         drawProperty(graphics, x, y, panelWidth, "state", cachedConnectionValues[0], 0, 0xFFE6EAF0);
         drawProperty(graphics, x, y, panelWidth, "channel", cachedConnectionValues[1], 1, 0xFFE6EAF0);
         drawProperty(graphics, x, y, panelWidth, "latency", cachedConnectionValues[2], 2,
-                peer.online() ? 0xFFE6EAF0 : 0xFFFF6666);
+                displayedPeer.online() ? 0xFFE6EAF0 : 0xFFB0BAC4);
         drawProperty(graphics, x, y, panelWidth, "state", cachedConnectionValues[3], 3,
-                peer.online() ? 0xFF72D18A : 0xFFFF6666);
+                displayedPeer.online() ? 0xFF72D18A : 0xFFB0BAC4);
         drawProperty(graphics, x, y, panelWidth, "version", cachedConnectionValues[4], 4, 0xFFE6EAF0);
         if (!copyStatus.isBlank()) graphics.drawString(font, copyStatus, 20, height - 48, 0xFF9FC8E8);
         super.render(graphics, mouseX, mouseY, delta);
@@ -85,7 +92,8 @@ public final class PeerDetailsScreen extends Screen {
     private void drawGroup(GuiGraphics graphics, int x, int y, int width, int height, Component heading) {
         graphics.fill(x, y, x + width, y + height, 0xAA101820);
         graphics.drawString(font, heading, x + 10, y + 5, 0xFF9FC8E8);
-        graphics.fill(x + 8, y + 17, x + width - 8, y + 19, 0xFF555555);
+        graphics.blit(RenderPipelines.GUI_TEXTURED, Screen.HEADER_SEPARATOR, x + 8, y + 17,
+                0.0F, 0.0F, width - 16, 2, 32, 2);
     }
 
     private void drawProperty(GuiGraphics graphics, int x, int y, int panelWidth,
@@ -101,15 +109,15 @@ public final class PeerDetailsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        if (event.button() == 0) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (event.button() == MouseButtons.left()) {
             int panelWidth = Math.min(620, width - 32);
             int x = (width - panelWidth) / 2;
             int y = Math.max(40, (height - 252) / 2);
             String value = valueAt(x, y, (int) event.x(), (int) event.y());
             if (value != null && !value.isBlank() && minecraft != null) {
                 minecraft.keyboardHandler.setClipboard(value);
-                copyStatus = "Copied: " + value;
+                copyStatus = Component.translatable("screen.radminlan.peer.copied", value).getString();
                 return true;
             }
         }
@@ -143,6 +151,11 @@ public final class PeerDetailsScreen extends Screen {
         cachedNetworkSnapshot = snapshot;
         List<RadminBackend.Network> networks = snapshot == null || snapshot.networks() == null
                 ? List.of() : snapshot.networks();
+        displayedPeer = networks.stream().filter(network -> network != null && network.peers() != null)
+                .flatMap(network -> network.peers().stream())
+                .filter(candidate -> candidate != null && samePeer(candidate, peer))
+                .findFirst().orElse(peer);
+        RadminBackend.Peer current = displayedPeer;
         String names = snapshot == null ? safe(peer.networkName()) : networks.stream()
                 .filter(network -> network != null && network.peers() != null
                         && network.peers().stream().anyMatch(candidate -> candidate != null && samePeer(candidate, peer)))
@@ -151,25 +164,27 @@ public final class PeerDetailsScreen extends Screen {
                 .distinct()
                 .reduce((left, right) -> left + ", " + right)
                 .orElse("");
-        String networkNames = names.isBlank() ? safe(peer.networkName()) : names;
-        String role = peer.role() == null ? emptyValue() : Component.translatable(switch (peer.role().intValue()) {
+        String networkNames = names.isBlank() ? safe(current.networkName()) : names;
+        String role = current.role() == null ? emptyValue() : Component.translatable(switch (current.role().intValue()) {
             case 1 -> "screen.radminlan.role_member";
             case 2 -> "screen.radminlan.role_admin";
             case 3 -> "screen.radminlan.role_pending";
             default -> "screen.radminlan.property.not_provided";
         }).getString();
-        cachedIdentityValues = new String[]{peer.name(), emptyDash(peer.virtualIp()),
-                peer.nodeId() < 0 ? emptyValue() : Long.toUnsignedString(peer.nodeId()), emptyValue(),
-                emptyDash(peer.virtualIpv6()), emptyDash(peer.publicIp())};
-        cachedIdentityCopyValues = new String[]{peer.name(), emptyText(peer.virtualIp()),
-                peer.nodeId() < 0 ? "" : Long.toUnsignedString(peer.nodeId()), "",
-                emptyText(peer.virtualIpv6()), emptyText(peer.publicIp())};
+        cachedIdentityValues = new String[]{current.name(), emptyDash(current.virtualIp()),
+                current.nodeId() < 0 ? emptyValue() : Long.toUnsignedString(current.nodeId()), emptyValue(),
+                emptyDash(current.virtualIpv6()), emptyDash(current.publicIp())};
+        cachedIdentityCopyValues = new String[]{current.name(), emptyText(current.virtualIp()),
+                current.nodeId() < 0 ? "" : Long.toUnsignedString(current.nodeId()), "",
+                emptyText(current.virtualIpv6()), emptyText(current.publicIp())};
         cachedNetworkValues = new String[]{emptyDash(networkNames), role};
         cachedNetworkCopyValues = new String[]{networkNames, role};
-        cachedConnectionValues = new String[]{emptyDash(peer.state()), emptyDash(peer.connectionType()),
-                formatLatency(peer.latencyMs(), peer.online()), peer.online() ? "Online" : "Offline", emptyDash(peer.version())};
-        cachedConnectionCopyValues = new String[]{emptyText(peer.state()), emptyText(peer.connectionType()),
-                formatLatency(peer.latencyMs(), peer.online()), peer.online() ? "Online" : "Offline", emptyText(peer.version())};
+        String state = statusText(current);
+        String latency = formatLatency(current.latencyMs(), current.online());
+        cachedConnectionValues = new String[]{state, emptyDash(current.connectionType()),
+                latency, state, emptyDash(current.version())};
+        cachedConnectionCopyValues = new String[]{state, emptyText(current.connectionType()),
+                current.online() && current.latencyMs() >= 0 ? latency : "", state, emptyText(current.version())};
     }
 
     private static boolean samePeer(RadminBackend.Peer left, RadminBackend.Peer right) {
@@ -188,5 +203,14 @@ public final class PeerDetailsScreen extends Screen {
         if (value == null || font.width(value) <= maxWidth) return value == null ? "" : value;
         return font.plainSubstrByWidth(value, Math.max(1, maxWidth - font.width("..."))) + "...";
     }
-    private static String formatLatency(long value, boolean online) { return !online || value < 0 ? "-1 ms" : value + " ms"; }
+    private static String statusText(RadminBackend.Peer peer) {
+        String key = peer.online() ? "online" : "offline".equalsIgnoreCase(peer.state()) ? "offline" : "unknown";
+        return Component.translatable("screen.radminlan.peer." + key).getString();
+    }
+
+    private static String formatLatency(long value, boolean online) {
+        if (!online) return "-";
+        return Component.translatable(value < 0 ? "screen.radminlan.peer.latency_unknown"
+                : "screen.radminlan.peer.latency", value).getString();
+    }
 }
